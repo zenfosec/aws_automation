@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "2.2",
+  "description": "SSM document to remove unapproved SSH keys from instances",
+  "parameters": {
+    "approvedKeys": {
+      "type": "StringList",
+      "description": "List of approved SSH public keys",
+      "default": []
+    },
+    "backupPath": {
+      "type": "String",
+      "description": "Path to backup the current authorized_keys file",
+      "default": "/tmp/authorized_keys.backup"
+    },
+    "logFile": {
+      "type": "String",
+      "description": "Path to log file for removed keys",
+      "default": "/var/log/ssh_key_removal.log"
+    }
+  },
+  "mainSteps": [
+    {
+      "action": "aws:runShellScript",
+      "name": "BackupAuthorizedKeys",
+      "inputs": {
+        "runCommand": [
+          "cp ~/.ssh/authorized_keys '{{backupPath}}'"
+        ]
+      }
+    },
+    {
+      "action": "aws:runShellScript",
+      "name": "RemoveUnapprovedKeys",
+      "inputs": {
+        "runCommand": [
+          "approvedKeys=$(printf '%s,' '{{approvedKeys}}')",
+          "currentKeys=$(cat ~/.ssh/authorized_keys)",
+          "newKeys=$(printf '%s\\n' $currentKeys | grep -vF -e '$approvedKeys')",
+          "removedKeys=$(printf '%s\\n' $currentKeys | grep -F -e '$approvedKeys' || true)",
+          "printf '%s' '$newKeys' > ~/.ssh/authorized_keys",
+          "printf '%s\\n' '$removedKeys' >> '{{logFile}}'"
+        ]
+      }
+    }
+  ]
+}
